@@ -98,11 +98,20 @@ func (c *Client) GetDeviceStatus(ctx context.Context) (*DeviceStatus, error) {
 	}
 
 	primary := listResp.Results[0]
-	isConnected := strings.EqualFold(primary.State, "connected")
+	// Sebuah device GOWA hanya benar-benar terhubung ke akun WhatsApp jika
+	// statusnya "connected" DAN sudah memiliki JID akun (nomor WhatsApp terverifikasi).
+	// Jika JID masih kosong, device baru berstatus placeholder yang sedang menunggu scan QR.
+	hasValidJID := strings.TrimSpace(primary.JID) != "" && strings.Contains(primary.JID, "@")
+	isConnected := strings.EqualFold(primary.State, "connected") && hasValidJID
+
+	state := primary.State
+	if !hasValidJID {
+		state = "unpaired"
+	}
 
 	return &DeviceStatus{
 		ID:        primary.ID,
-		State:     primary.State,
+		State:     state,
 		JID:       primary.JID,
 		Connected: isConnected,
 	}, nil
@@ -119,8 +128,8 @@ func (c *Client) GetQRCodePNG(ctx context.Context) ([]byte, int, error) {
 	}
 
 	deviceID := status.ID
-	if deviceID == "" || status.State == "unpaired" {
-		// Buat placeholder device baru
+	if deviceID == "" {
+		// Buat placeholder device baru jika belum ada
 		createdID, err := c.createDevice(ctx)
 		if err != nil {
 			return nil, 0, fmt.Errorf("gagal membuat perangkat baru di GOWA: %w", err)
@@ -136,15 +145,35 @@ func (c *Client) GetQRCodePNG(ctx context.Context) ([]byte, int, error) {
 	loginReq.SetBasicAuth(c.basicAuthUser, c.basicAuthPass)
 
 	loginResp, err := c.httpClient.Do(loginReq)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to request login QR: %w", err)
+	if err != nil || loginResp.StatusCode != http.StatusOK {
+		if loginResp != nil {
+			loginResp.Body.Close()
+		}
+		// Jika device lama stale atau gagal login, reset dan coba dengan device baru
+		_ = c.DeleteDevice(ctx)
+		newID, createErr := c.createDevice(ctx)
+		if createErr != nil {
+			return nil, 0, fmt.Errorf("gagal membuat perangkat baru: %w", createErr)
+		}
+		deviceID = newID
+
+		loginReq, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/devices/%s/login", c.baseURL, deviceID), nil)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to create login request: %w", err)
+		}
+		loginReq.SetBasicAuth(c.basicAuthUser, c.basicAuthPass)
+
+		loginResp, err = c.httpClient.Do(loginReq)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to request login QR: %w", err)
+		}
+		if loginResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(loginResp.Body)
+			loginResp.Body.Close()
+			return nil, 0, fmt.Errorf("GOWA login returned HTTP %d: %s", loginResp.StatusCode, string(body))
+		}
 	}
 	defer loginResp.Body.Close()
-
-	if loginResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(loginResp.Body)
-		return nil, 0, fmt.Errorf("GOWA login returned HTTP %d: %s", loginResp.StatusCode, string(body))
-	}
 
 	var loginData gowaLoginResponse
 	if err := json.NewDecoder(loginResp.Body).Decode(&loginData); err != nil {

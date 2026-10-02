@@ -45,8 +45,8 @@
           Nomor kampus Anda sedang aktif terhubung ke gateway GOWA dan siap menerima pesan masuk untuk dianalisis oleh AI.
         </p>
         <div style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
-          ID Perangkat: <code id="wa-device-id" style="color: var(--primary);">{{if .WAStatus}}{{.WAStatus.ID}}{{end}}</code>
-          {{if and .WAStatus .WAStatus.JID}}<br>JID WhatsApp: <strong style="color: var(--text-main);">{{.WAStatus.JID}}</strong>{{end}}
+          Nomor WhatsApp: <strong id="wa-jid" style="color: var(--text-main);">{{if and .WAStatus .WAStatus.JID}}{{.WAStatus.JID}}{{end}}</strong>
+          <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID Internal Gateway: <code id="wa-device-id">{{if .WAStatus}}{{.WAStatus.ID}}{{end}}</code></span>
         </div>
       </div>
       <form method="POST" action="/api/whatsapp/reset" onsubmit="return confirm('Apakah Anda yakin ingin memutuskan dan mereset sesi WhatsApp ini?');">

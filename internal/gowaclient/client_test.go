@@ -123,3 +123,38 @@ func TestGOWAClient_GetQRCodePNG(t *testing.T) {
 		t.Errorf("expected %d bytes, got %d", len(fakePNG), len(qrBytes))
 	}
 }
+
+func TestGOWAClient_GetDeviceStatus_ConnectedStateWithoutJID_IsUnpaired(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/devices" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"code":    "SUCCESS",
+				"message": "List devices",
+				"results": []map[string]any{
+					{
+						"id":    "placeholder-uuid",
+						"state": "connected",
+						"jid":   "",
+					},
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	client := NewClient(ts.URL, "admin", "pass")
+	status, err := client.GetDeviceStatus(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if status.Connected {
+		t.Errorf("expected Connected to be false when JID is empty, got true")
+	}
+	if status.State != "unpaired" {
+		t.Errorf("expected State to be 'unpaired', got '%s'", status.State)
+	}
+}
+
