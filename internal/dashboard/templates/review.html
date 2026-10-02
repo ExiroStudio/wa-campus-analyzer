@@ -1,0 +1,98 @@
+{{define "content"}}
+<div style="margin-bottom: 1.5rem;">
+  <h2>⚠️ Antrean Perlu Review & Job Gagal</h2>
+  <p style="color: var(--text-muted); font-size: 0.9rem;">Daftar pesan dengan tingkat kepercayaan rendah, ketiadaan batas waktu tugas, atau kegagalan API AI</p>
+</div>
+
+<div class="card">
+  <div class="card-header" style="color: #f59e0b;">
+    <span>🔍 Perlu Review Manusia (Confidence Rendah / Deadline Kosong) ({{len .NeedsReviewItems}})</span>
+  </div>
+  {{if not .NeedsReviewItems}}
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Tidak ada pesan yang memerlukan review saat ini. Semua klasifikasi aman!</p>
+  {{else}}
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>Pengirim & Chat</th>
+            <th>Kategori Terdeteksi</th>
+            <th>Ringkasan</th>
+            <th>Alasan Review</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .NeedsReviewItems}}
+          <tr>
+            <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">{{.DisplayTime}}</td>
+            <td>
+              <div style="font-weight: 600;">{{.SenderName}}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">{{.ChatName}}</div>
+            </td>
+            <td><span class="badge badge-{{.Category}}">{{.Category}}</span></td>
+            <td><div style="font-weight: 500;">{{.Summary}}</div></td>
+            <td>
+              <span style="color: #f59e0b; font-size: 0.85rem;">{{.ReviewReason}}</span>
+            </td>
+            <td style="white-space: nowrap;">
+              <a href="/messages/{{.MessageID}}" class="btn btn-sm btn-primary">Review & Koreksi</a>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  {{end}}
+</div>
+
+<div class="card">
+  <div class="card-header" style="color: #ef4444;">
+    <span>❌ Job Analisis Gagal ({{len .FailedJobs}})</span>
+  </div>
+  {{if not .FailedJobs}}
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Tidak ada job analisis yang gagal. Antrean berjalan lancar!</p>
+  {{else}}
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Waktu Pesan</th>
+            <th>Pengirim & Chat</th>
+            <th>Isi Pesan</th>
+            <th>Pesan Error Terakhir</th>
+            <th>Percobaan</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .FailedJobs}}
+          <tr>
+            <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">{{.DisplayTime}}</td>
+            <td>
+              <div style="font-weight: 600;">{{.SenderName}}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">{{.ChatName}}</div>
+            </td>
+            <td style="max-width: 250px;">
+              <div style="font-size: 0.85rem; color: var(--text-main);">{{.TruncatedBody}}</div>
+            </td>
+            <td>
+              <span style="color: #f87171; font-size: 0.85rem; font-family: monospace;">{{.LastError}}</span>
+            </td>
+            <td>{{.Attempts}}x</td>
+            <td style="white-space: nowrap;">
+              <form action="/jobs/{{.JobID}}/retry" method="POST" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button type="submit" class="btn btn-sm btn-primary">🔄 Coba Lagi</button>
+              </form>
+              <a href="/messages/{{.MessageID}}" class="btn btn-sm btn-secondary">Detail</a>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,41 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.Title}} - WA Campus Analyzer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">
+      🎓 WA Campus Analyzer
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="/" class="nav-link {{if eq .ActiveNav "inbox"}}active{{end}}">📥 Inbox</a></li>
+      <li><a href="/agenda" class="nav-link {{if eq .ActiveNav "agenda"}}active{{end}}">📅 Agenda</a></li>
+      <li><a href="/review" class="nav-link {{if eq .ActiveNav "review"}}active{{end}}">⚠️ Perlu Review</a></li>
+      <li><a href="/status" class="nav-link {{if eq .ActiveNav "status"}}active{{end}}">📊 Status</a></li>
+      <li>
+        <form action="/logout" method="POST" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+          <button type="submit" class="btn btn-sm btn-secondary">Keluar</button>
+        </form>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="container">
+    {{if .FlashError}}
+      <div class="alert alert-danger">{{.FlashError}}</div>
+    {{end}}
+    {{if .FlashSuccess}}
+      <div class="alert alert-success">{{.FlashSuccess}}</div>
+    {{end}}
+
+    {{template "content" .}}
+  </main>
+</body>
+</html>
+{{end}}

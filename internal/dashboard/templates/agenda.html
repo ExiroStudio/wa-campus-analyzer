@@ -1,0 +1,97 @@
+{{define "agendaSection"}}
+<div class="card">
+  <div class="card-header">
+    <span>{{.Title}} ({{len .Items}})</span>
+  </div>
+  {{if not .Items}}
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Tidak ada jadwal di periode ini.</p>
+  {{else}}
+    <div class="table-responsive">
+      <table>
+        <tbody>
+          {{range .Items}}
+          <tr>
+            <td style="width: 140px; font-weight: 600;">
+              {{if .IsEvent}}🗓️ {{.DisplayTargetDate}}{{else}}⏳ {{.DisplayTargetDate}}{{end}}
+            </td>
+            <td>
+              <span class="badge badge-{{.Category}}">{{.Category}}</span>
+              <span style="font-weight: 600; margin-left: 0.5rem;">{{.Summary}}</span>
+              {{if .Topic}}
+                <span style="font-size: 0.8rem; background: rgba(255,255,255,0.05); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.35rem;">{{.Topic}}</span>
+              {{end}}
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+                {{.ChatName}} • {{.SenderName}} {{if .EventLocation}}• Lokasi: {{.EventLocation}}{{end}}
+              </div>
+            </td>
+            <td style="text-align: right; white-space: nowrap;">
+              <a href="/messages/{{.MessageID}}" class="btn btn-sm btn-secondary">Detail</a>
+              {{if ne .UserStateStatus "done"}}
+              <form action="/messages/{{.MessageID}}/status" method="POST" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="status" value="done">
+                <input type="hidden" name="redirect" value="/agenda">
+                <button type="submit" class="btn btn-sm btn-success">✓ Selesai</button>
+              </form>
+              {{else}}
+                <span class="badge badge-done">Selesai</span>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "content"}}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+  <div>
+    <h2>📅 Agenda & Batas Waktu Kampus</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">Daftar tugas, ujian, dan event akademik terkelompok menurut waktu</p>
+  </div>
+</div>
+
+{{if .Overdue}}
+<div class="card" style="border-left: 4px solid var(--danger);">
+  <div class="card-header" style="color: #f87171;">
+    <span>⚠️ Lewat Batas Waktu & Belum Selesai ({{len .Overdue}})</span>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <tbody>
+        {{range .Overdue}}
+        <tr>
+          <td style="width: 130px; font-weight: 600; color: #f87171;">{{.DisplayTargetDate}}</td>
+          <td>
+            <span class="badge badge-{{.Category}}">{{.Category}}</span>
+            <span style="font-weight: 600; margin-left: 0.5rem;">{{.Summary}}</span>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+              {{.ChatName}} • {{.SenderName}}
+            </div>
+          </td>
+          <td style="text-align: right; white-space: nowrap;">
+            <a href="/messages/{{.MessageID}}" class="btn btn-sm btn-secondary">Detail</a>
+            <form action="/messages/{{.MessageID}}/status" method="POST" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <input type="hidden" name="status" value="done">
+              <input type="hidden" name="redirect" value="/agenda">
+              <button type="submit" class="btn btn-sm btn-success">✓ Selesai</button>
+            </form>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{template "agendaSection" dict "Title" "Hari Ini" "Items" .Today "CSRFToken" .CSRFToken}}
+{{template "agendaSection" dict "Title" "Besok" "Items" .Tomorrow "CSRFToken" .CSRFToken}}
+{{template "agendaSection" dict "Title" "Minggu Ini" "Items" .ThisWeek "CSRFToken" .CSRFToken}}
+{{template "agendaSection" dict "Title" "Nanti (Mendatang)" "Items" .Later "CSRFToken" .CSRFToken}}
+
+{{end}}

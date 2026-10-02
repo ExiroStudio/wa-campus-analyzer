@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - WA Campus Analyzer</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .login-box {
+      width: 100%;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="card login-box">
+      <div class="card-header" style="justify-content: center; flex-direction: column; gap: 0.5rem;">
+        <span style="font-size: 2.5rem;">🎓</span>
+        <h2 style="font-size: 1.25rem;">WA Campus Analyzer</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">Masukkan password dashboard untuk masuk</p>
+      </div>
+
+      {{if .Error}}
+        <div class="alert alert-danger">{{.Error}}</div>
+      {{end}}
+
+      <form action="/login" method="POST">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="form-group">
+          <label for="password">Password Dashboard</label>
+          <input type="password" id="password" name="password" required autofocus autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Masuk</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

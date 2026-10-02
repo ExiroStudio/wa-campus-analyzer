@@ -1,0 +1,159 @@
+{{define "content"}}
+<div class="card">
+  <div class="card-header">
+    <span>🔍 Filter & Pencarian Pesan</span>
+  </div>
+  <form method="GET" action="/">
+    <div class="filters-bar">
+      <div class="form-group">
+        <label for="q">Pencarian Teks</label>
+        <input type="text" id="q" name="q" value="{{.Filters.Q}}" placeholder="Cari pesan atau ringkasan...">
+      </div>
+      <div class="form-group">
+        <label for="category">Kategori</label>
+        <select id="category" name="category">
+          <option value="">Semua Kategori</option>
+          <option value="tugas" {{if eq .Filters.Category "tugas"}}selected{{end}}>Tugas</option>
+          <option value="ujian_kuis" {{if eq .Filters.Category "ujian_kuis"}}selected{{end}}>Ujian & Kuis</option>
+          <option value="workshop_event" {{if eq .Filters.Category "workshop_event"}}selected{{end}}>Workshop & Event</option>
+          <option value="jadwal" {{if eq .Filters.Category "jadwal"}}selected{{end}}>Jadwal Kuliah</option>
+          <option value="pengumuman" {{if eq .Filters.Category "pengumuman"}}selected{{end}}>Pengumuman</option>
+          <option value="info_umum" {{if eq .Filters.Category "info_umum"}}selected{{end}}>Info Umum</option>
+          <option value="obrolan" {{if eq .Filters.Category "obrolan"}}selected{{end}}>Obrolan</option>
+          <option value="spam" {{if eq .Filters.Category "spam"}}selected{{end}}>Spam</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="min_importance">Importance Min</label>
+        <select id="min_importance" name="min_importance">
+          <option value="">Semua</option>
+          <option value="4" {{if eq .Filters.MinImportance "4"}}selected{{end}}>⭐⭐⭐⭐ (4-5 Penting)</option>
+          <option value="3" {{if eq .Filters.MinImportance "3"}}selected{{end}}>⭐⭐⭐ (3+ Sedang)</option>
+          <option value="2" {{if eq .Filters.MinImportance "2"}}selected{{end}}>⭐⭐ (2+ Biasa)</option>
+          <option value="1" {{if eq .Filters.MinImportance "1"}}selected{{end}}>⭐ (1+ Semua)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="">Semua Status</option>
+          <option value="open" {{if eq .Filters.Status "open"}}selected{{end}}>Open</option>
+          <option value="done" {{if eq .Filters.Status "done"}}selected{{end}}>Selesai (Done)</option>
+          <option value="dismissed" {{if eq .Filters.Status "dismissed"}}selected{{end}}>Abaikan (Dismissed)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="flag">Filter Khusus</label>
+        <select id="flag" name="flag">
+          <option value="">Semua Pesan</option>
+          <option value="needs_review" {{if eq .Filters.Flag "needs_review"}}selected{{end}}>Perlu Review</option>
+          <option value="failed" {{if eq .Filters.Flag "failed"}}selected{{end}}>Gagal Analisis</option>
+          <option value="skipped" {{if eq .Filters.Flag "skipped"}}selected{{end}}>Dilewati (Skipped)</option>
+        </select>
+      </div>
+    </div>
+    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+      <a href="/" class="btn btn-secondary">Reset</a>
+      <button type="submit" class="btn btn-primary">Terapkan Filter</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span>Daftar Pesan Masuk (Total: {{.TotalCount}})</span>
+  </div>
+
+  {{if not .Messages}}
+    <p style="text-align: center; color: var(--text-muted); padding: 2rem 0;">Tidak ada pesan yang sesuai dengan filter.</p>
+  {{else}}
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>Pengirim & Chat</th>
+            <th>Kategori & Skor</th>
+            <th>Ringkasan & Isi</th>
+            <th>Batas Waktu</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Messages}}
+          <tr>
+            <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">
+              {{.DisplayTime}}
+            </td>
+            <td>
+              <div style="font-weight: 600;">{{.SenderName}}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">{{.ChatName}}</div>
+            </td>
+            <td>
+              {{if .Category}}
+                <span class="badge badge-{{.Category}}">{{.Category}}</span>
+                <div class="stars" title="Skor: {{.Importance}}">
+                  {{range $i := .StarsFull}}★{{end}}{{range $i := .StarsEmpty}}☆{{end}}
+                </div>
+              {{else if eq .JobStatus "skipped"}}
+                <span class="badge" style="background:#475569; color:#cbd5e1;">Dilewati</span>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{{.LastError}}</div>
+              {{else if eq .JobStatus "failed"}}
+                <span class="badge" style="background:#ef4444; color:#fff;">Gagal</span>
+              {{else}}
+                <span class="badge" style="background:#eab308; color:#000;">Diproses</span>
+              {{end}}
+            </td>
+            <td>
+              {{if .Summary}}
+                <div style="font-weight: 500; color: #fff;">{{.Summary}}</div>
+              {{end}}
+              <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                {{if and .HasMedia (eq .Body "")}}
+                  <em>📷 [Media tanpa teks]</em>
+                {{else}}
+                  {{.TruncatedBody}}
+                {{end}}
+              </div>
+            </td>
+            <td style="white-space: nowrap; font-size: 0.85rem;">
+              {{if .DisplayDeadline}}
+                <span style="color: #f87171; font-weight: 600;">⏳ {{.DisplayDeadline}}</span>
+              {{else if .DisplayEventStart}}
+                <span style="color: #60a5fa; font-weight: 600;">🗓️ {{.DisplayEventStart}}</span>
+              {{else}}
+                <span style="color: var(--text-muted);">-</span>
+              {{end}}
+            </td>
+            <td>
+              <span class="badge badge-{{.UserStateStatus}}">{{.UserStateStatus}}</span>
+              {{if eq .NeedsReview 1}}
+                <span class="badge" style="background: #f59e0b; color: #000; margin-top: 0.25rem;">Review</span>
+              {{end}}
+            </td>
+            <td style="white-space: nowrap;">
+              <a href="/messages/{{.ID}}" class="btn btn-sm btn-primary">Detail</a>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    {{if gt .TotalPages 1}}
+    <div class="pagination">
+      {{if gt .CurrentPage 1}}
+        <a href="?page={{sub .CurrentPage 1}}&category={{.Filters.Category}}&min_importance={{.Filters.MinImportance}}&status={{.Filters.Status}}&flag={{.Filters.Flag}}&q={{.Filters.Q}}" class="btn btn-sm btn-secondary">« Sebelumnya</a>
+      {{end}}
+      <span style="align-self: center; font-size: 0.85rem; color: var(--text-muted);">
+        Halaman {{.CurrentPage}} dari {{.TotalPages}}
+      </span>
+      {{if lt .CurrentPage .TotalPages}}
+        <a href="?page={{add .CurrentPage 1}}&category={{.Filters.Category}}&min_importance={{.Filters.MinImportance}}&status={{.Filters.Status}}&flag={{.Filters.Flag}}&q={{.Filters.Q}}" class="btn btn-sm btn-secondary">Berikutnya »</a>
+      {{end}}
+    </div>
+    {{end}}
+  {{end}}
+</div>
+{{end}}

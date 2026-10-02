@@ -1,0 +1,128 @@
+{{define "content"}}
+<div style="margin-bottom: 1.5rem;">
+  <h2>📊 Statistik & Kesehatan Sistem</h2>
+  <p style="color: var(--text-muted); font-size: 0.9rem;">Metrik penerimaan pesan, konsumsi token, status antrean worker, dan kesehatan webhook</p>
+</div>
+
+<!-- Key Stat Cards -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Pesan Diterima</div>
+    <div class="stat-val">{{.TotalMessages}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Pesan Dianalisis AI</div>
+    <div class="stat-val">{{.TotalAnalyses}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Job Menunggu (Pending)</div>
+    <div class="stat-val" style="color: var(--warning);">{{.PendingJobs}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Job Gagal (Failed)</div>
+    <div class="stat-val" style="color: var(--danger);">{{.FailedJobs}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Token AI Terpakai</div>
+    <div class="stat-val" style="color: var(--purple);">{{.TotalTokens}}</div>
+    <div style="font-size: 0.75rem; color: var(--text-muted);">{{.TokensIn}} in / {{.TokensOut}} out</div>
+  </div>
+</div>
+
+<!-- Webhook & System Health -->
+<div class="card">
+  <div class="card-header">
+    <span>💓 Status Webhook WhatsApp & Database</span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 6px;">
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Status Webhook GOWA:</div>
+      <div style="font-weight: 600; font-size: 1.1rem; color: {{if .IsWebhookActive}}var(--success){{else}}var(--warning){{end}};">
+        {{if .IsWebhookActive}}🟢 Aktif & Berjalan{{else}}🟡 Tidak Ada Pesan Baru / Belum Aktif{{end}}
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem;">
+        Pesan terakhir diterima: <strong>{{if .LastMessageTime}}{{.LastMessageTime}}{{else}}Belum pernah{{end}}</strong>
+        {{if .LastMessageAge}}<br>({{printf "%.0f" .LastMessageAge}} detik yang lalu){{end}}
+      </div>
+    </div>
+    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 6px;">
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Status Database SQLite:</div>
+      <div style="font-weight: 600; font-size: 1.1rem; color: var(--success);">
+        🟢 Terhubung (WAL Mode)
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem;">
+        Path: <code>{{.DBPath}}</code><br>
+        Zona Waktu: <strong>{{.TZName}}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+  <!-- Category Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <span>🏷️ Distribusi Kategori Pesan</span>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Kategori</th>
+            <th>Jumlah</th>
+            <th>Persentase</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .CategoryStats}}
+          <tr>
+            <td><span class="badge badge-{{.Category}}">{{.Category}}</span></td>
+            <td style="font-weight: 600;">{{.Count}}</td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; width: {{printf "%.1f" .Percentage}}%; background: var(--primary);"></div>
+                </div>
+                <span style="font-size: 0.75rem; width: 45px;">{{printf "%.1f" .Percentage}}%</span>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Messages per Day -->
+  <div class="card">
+    <div class="card-header">
+      <span>📈 Tren Pesan Masuk (7 Hari Terakhir)</span>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Jumlah Pesan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .DailyStats}}
+          <tr>
+            <td style="font-weight: 500;">{{.Date}}</td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-weight: 600; width: 30px;">{{.Count}}</span>
+                <div style="flex: 1; height: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; width: {{printf "%.1f" .Percentage}}%; background: var(--success);"></div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

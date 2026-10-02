@@ -1,0 +1,70 @@
+services:
+  analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wa-campus-analyzer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - LISTEN_ADDR=0.0.0.0:8080
+      - DB_PATH=/app/data/analyzer.db
+      - GOWA_WEBHOOK_SECRET=${GOWA_WEBHOOK_SECRET}
+      - OMNIROUTE_BASE_URL=${OMNIROUTE_BASE_URL}
+      - OMNIROUTE_API_KEY=${OMNIROUTE_API_KEY}
+      - OMNIROUTE_MODEL=${OMNIROUTE_MODEL}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - TZ_NAME=${TZ_NAME:-Asia/Jakarta}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-2}
+      - CONTEXT_MESSAGES=${CONTEXT_MESSAGES:-5}
+      - CONTEXT_WINDOW_HOURS=${CONTEXT_WINDOW_HOURS:-24}
+      - RETENTION_DAYS=${RETENTION_DAYS:-0}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - internal-net
+    depends_on:
+      - gowa
+
+  gowa:
+    image: aldinokemal2104/go-whatsapp-web-multidevice:latest
+    container_name: wa-campus-gowa
+    restart: unless-stopped
+    command: ["rest"]
+    environment:
+      - APP_PORT=3000
+      - APP_HOST=0.0.0.0
+      - APP_BASIC_AUTH=admin:${GOWA_BASIC_AUTH_PASSWORD:-gowaSecureAdmin123}
+      # Read-only and privacy enforcement
+      - MCP_ENABLED=false
+      - WHATSAPP_PRESENCE_PULSE_ENABLED=false
+      - WHATSAPP_PRESENCE_ON_CONNECT=unavailable
+      - WHATSAPP_AUTO_MARK_READ=false
+      - WHATSAPP_AUTO_REJECT_CALL=false
+      - WHATSAPP_AUTO_REPLY=
+      # Webhook configuration to analyzer internal network
+      - WHATSAPP_WEBHOOK=http://analyzer:8080/webhook/gowa
+      - WHATSAPP_WEBHOOK_SECRET=${GOWA_WEBHOOK_SECRET}
+      - WHATSAPP_WEBHOOK_EVENTS=message
+    volumes:
+      - gowa-storages:/app/storages
+      - gowa-statics:/app/statics
+    networks:
+      - internal-net
+    # CATATAN SCAN QR:
+    # Port 3000 TIDAK dipublish secara default agar terisolasi.
+    # Untuk scan QR saat login pertama kali, buka port sementara di bawah ini ke 127.0.0.1:3000:3000:
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+    # Setelah QR berhasil di-scan, comment kembali baris ports di atas dan jalankan:
+    # docker compose up -d
+
+volumes:
+  gowa-storages:
+  gowa-statics:
+
+networks:
+  internal-net:
+    driver: bridge

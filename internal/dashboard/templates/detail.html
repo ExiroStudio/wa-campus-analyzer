@@ -1,0 +1,207 @@
+{{define "content"}}
+<div style="margin-bottom: 1rem;">
+  <a href="/" style="color: var(--text-muted);">&larr; Kembali ke Inbox</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+  <!-- Left Column: Original Message & Context -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <span>📩 Pesan WhatsApp Asli</span>
+        <span class="badge badge-info_umum">{{.Message.MsgType}}</span>
+      </div>
+      <div style="margin-bottom: 0.75rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Pengirim:</div>
+        <div style="font-weight: 600;">{{.Message.SenderName}} ({{.Message.SenderJID}})</div>
+      </div>
+      <div style="margin-bottom: 0.75rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Chat / Grup:</div>
+        <div style="font-weight: 600;">{{.Message.ChatName}} ({{.Message.ChatJID}})</div>
+      </div>
+      <div style="margin-bottom: 0.75rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Waktu Terkirim:</div>
+        <div>{{.Message.DisplaySentAt}}</div>
+      </div>
+
+      <div style="margin-top: 1rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">Isi Pesan:</div>
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--card-border); padding: 1rem; border-radius: 6px; white-space: pre-wrap; word-break: break-word;">
+          {{if and .Message.HasMedia (eq .Message.Body "")}}
+            <em>📷 [Media tanpa teks / stiker]</em>
+          {{else}}
+            {{.Message.Body}}
+          {{end}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Context Sent to AI -->
+    <div class="card">
+      <div class="card-header">
+        <span>📜 Konteks Pesan Terdahulu ({{len .ContextMessages}})</span>
+      </div>
+      {{if not .ContextMessages}}
+        <p style="color: var(--text-muted); font-size: 0.85rem;">Tidak ada pesan konteks sebelumnya dalam jendela waktu.</p>
+      {{else}}
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          {{range .ContextMessages}}
+          <div style="background: rgba(0,0,0,0.2); padding: 0.6rem 0.8rem; border-radius: 6px; border-left: 3px solid var(--card-border);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+              <span>{{.SenderName}}</span>
+              <span>{{.DisplayTime}}</span>
+            </div>
+            <div style="font-size: 0.85rem; margin-top: 0.25rem;">{{.Body}}</div>
+          </div>
+          {{end}}
+        </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Right Column: Analysis & Feedback Actions -->
+  <div>
+    <!-- Analysis Result -->
+    <div class="card">
+      <div class="card-header">
+        <span>🤖 Hasil Analisis AI</span>
+        {{if .Analysis}}
+          <span class="badge badge-{{.Analysis.Category}}">{{.Analysis.Category}}</span>
+        {{end}}
+      </div>
+
+      {{if not .Analysis}}
+        <p style="color: var(--text-muted);">Pesan ini belum memiliki hasil analisis (Status Job: {{.Job.Status}}).</p>
+      {{else}}
+        <div style="margin-bottom: 0.75rem;">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Ringkasan:</div>
+          <div style="font-weight: 600; font-size: 1rem; color: #fff;">{{.Analysis.Summary}}</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Importance:</div>
+            <div class="stars">{{range $i := .StarsFull}}★{{end}}{{range $i := .StarsEmpty}}☆{{end}} ({{.Analysis.Importance}}/5)</div>
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Confidence:</div>
+            <div>{{printf "%.0f%%" (mul .Analysis.Confidence 100)}}</div>
+          </div>
+        </div>
+
+        {{if .Analysis.Topic}}
+        <div style="margin-bottom: 0.75rem;">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Topik / Mata Kuliah:</div>
+          <div style="font-weight: 500;">{{.Analysis.Topic}}</div>
+        </div>
+        {{end}}
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Batas Waktu (Deadline):</div>
+            <div style="font-weight: 600; color: #f87171;">{{if .Analysis.DisplayDeadline}}{{.Analysis.DisplayDeadline}}{{else}}-{{end}}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Waktu Acara:</div>
+            <div style="font-weight: 600; color: #60a5fa;">{{if .Analysis.DisplayEventStart}}{{.Analysis.DisplayEventStart}}{{else}}-{{end}}</div>
+          </div>
+        </div>
+
+        {{if .Analysis.EventLocation}}
+        <div style="margin-bottom: 0.75rem;">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Lokasi / Tautan Acara:</div>
+          <div>{{.Analysis.EventLocation}}</div>
+        </div>
+        {{end}}
+
+        <div style="margin-bottom: 0.75rem;">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Alasan (Reasoning):</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">"{{.Analysis.Reasoning}}"</div>
+        </div>
+
+        <details style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
+          <summary style="cursor: pointer; font-weight: 500;">Metadata Model & Raw Response</summary>
+          <div style="margin-top: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: 6px;">
+            <div>Model: {{.Analysis.Model}} | Prompt: {{.Analysis.PromptVersion}}</div>
+            <div>Token: {{.Analysis.TokensIn}} in, {{.Analysis.TokensOut}} out</div>
+            <pre style="margin-top: 0.5rem; white-space: pre-wrap; font-family: monospace;">{{.Analysis.RawResponse}}</pre>
+          </div>
+        </details>
+      {{end}}
+    </div>
+
+    <!-- User Feedback & State Override Form -->
+    <div class="card">
+      <div class="card-header">
+        <span>✏️ Pengaturan & Feedback Pengguna</span>
+      </div>
+      <form action="/messages/{{.Message.ID}}/feedback" method="POST">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="form-group">
+          <label for="status">Status Lokal</label>
+          <select id="status" name="status">
+            <option value="open" {{if eq .UserState.Status "open"}}selected{{end}}>Open (Belum Selesai)</option>
+            <option value="done" {{if eq .UserState.Status "done"}}selected{{end}}>Done (Selesai)</option>
+            <option value="dismissed" {{if eq .UserState.Status "dismissed"}}selected{{end}}>Dismissed (Diabaikan)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="category_override">Koreksi Kategori (Opsional)</label>
+          <select id="category_override" name="category_override">
+            <option value="">-- Pertahankan Hasil AI --</option>
+            <option value="tugas" {{if eq .UserState.CategoryOverride "tugas"}}selected{{end}}>Tugas</option>
+            <option value="ujian_kuis" {{if eq .UserState.CategoryOverride "ujian_kuis"}}selected{{end}}>Ujian & Kuis</option>
+            <option value="workshop_event" {{if eq .UserState.CategoryOverride "workshop_event"}}selected{{end}}>Workshop & Event</option>
+            <option value="jadwal" {{if eq .UserState.CategoryOverride "jadwal"}}selected{{end}}>Jadwal Kuliah</option>
+            <option value="pengumuman" {{if eq .UserState.CategoryOverride "pengumuman"}}selected{{end}}>Pengumuman</option>
+            <option value="info_umum" {{if eq .UserState.CategoryOverride "info_umum"}}selected{{end}}>Info Umum</option>
+            <option value="obrolan" {{if eq .UserState.CategoryOverride "obrolan"}}selected{{end}}>Obrolan</option>
+            <option value="spam" {{if eq .UserState.CategoryOverride "spam"}}selected{{end}}>Spam</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="importance_override">Koreksi Importance (1-5)</label>
+          <select id="importance_override" name="importance_override">
+            <option value="">-- Pertahankan Hasil AI --</option>
+            <option value="5" {{if eq .UserState.ImportanceOverride 5}}selected{{end}}>⭐⭐⭐⭐⭐ (5 Sangat Penting)</option>
+            <option value="4" {{if eq .UserState.ImportanceOverride 4}}selected{{end}}>⭐⭐⭐⭐ (4 Mendesak)</option>
+            <option value="3" {{if eq .UserState.ImportanceOverride 3}}selected{{end}}>⭐⭐⭐ (3 Tugas/Ujian)</option>
+            <option value="2" {{if eq .UserState.ImportanceOverride 2}}selected{{end}}>⭐⭐ (2 Rutin)</option>
+            <option value="1" {{if eq .UserState.ImportanceOverride 1}}selected{{end}}>⭐ (1 Info)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="note">Catatan Tambahan Pribadi</label>
+          <textarea id="note" name="note" rows="2" placeholder="Tulis catatan untuk tugas/info ini...">{{.UserState.Note}}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Simpan Perubahan</button>
+      </form>
+    </div>
+
+    <!-- Additional Quick Actions -->
+    <div class="card" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <!-- Re-analyze button -->
+      <form action="/messages/{{.Message.ID}}/reanalyze" method="POST" style="flex: 1;">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="btn btn-secondary" style="width: 100%; justify-content: center;">🔄 Analisis Ulang</button>
+      </form>
+
+      <!-- Ignore Chat Button -->
+      {{if not .IsChatIgnored}}
+      <form action="/chats/ignore" method="POST" style="flex: 1;" onsubmit="return confirm('Apakah Anda yakin ingin mengabaikan seluruh pesan mendatang dari chat ini?');">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <input type="hidden" name="chat_jid" value="{{.Message.ChatJID}}">
+        <input type="hidden" name="message_id" value="{{.Message.ID}}">
+        <button type="submit" class="btn btn-danger" style="width: 100%; justify-content: center;">🚫 Abaikan Chat Ini</button>
+      </form>
+      {{else}}
+        <span class="badge" style="background:#ef4444; color:#fff; align-self:center;">Chat diabaikan</span>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
