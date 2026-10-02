@@ -1,5 +1,8 @@
 # Stage 1: Build binary
-FROM golang:alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -14,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Build pure Go binary without CGO
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/analyzer ./cmd/analyzer
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /app/analyzer ./cmd/analyzer
 
 # Stage 2: Minimal runtime image
 FROM alpine:latest
