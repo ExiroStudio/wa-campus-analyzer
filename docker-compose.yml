@@ -11,6 +11,8 @@ services:
       - LISTEN_ADDR=0.0.0.0:8080
       - DB_PATH=/app/data/analyzer.db
       - GOWA_WEBHOOK_SECRET=${GOWA_WEBHOOK_SECRET}
+      - GOWA_BASE_URL=http://gowa:3000
+      - GOWA_BASIC_AUTH_PASSWORD=${GOWA_BASIC_AUTH_PASSWORD:-gowaSecureAdmin123}
       - OMNIROUTE_BASE_URL=${OMNIROUTE_BASE_URL}
       - OMNIROUTE_API_KEY=${OMNIROUTE_API_KEY}
       - OMNIROUTE_MODEL=${OMNIROUTE_MODEL}
@@ -55,11 +57,8 @@ services:
       - internal-net
     # CATATAN SCAN QR:
     # Port 3000 TIDAK dipublish secara default agar terisolasi.
-    # Untuk scan QR saat login pertama kali, buka port sementara di bawah ini ke 127.0.0.1:3000:3000:
-    # ports:
-    #   - "127.0.0.1:3000:3000"
-    # Setelah QR berhasil di-scan, comment kembali baris ports di atas dan jalankan:
-    # docker compose up -d
+    # Port 3000 terisolasi penuh di dalam network Docker (internal-net).
+    # Interaksi status & QR Code dilayani langsung via Analyzer di port 8080.
 
 volumes:
   gowa-storages:

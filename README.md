@@ -39,34 +39,23 @@ Isi konfigurasi berikut di file `.env`:
 - `DASHBOARD_PASSWORD`: Password tunggal untuk login ke dashboard web.
 - `SESSION_SECRET`: String rahasia minimal 32 karakter untuk penanda tangan cookie sesi.
 
-### 2. Login & Scan QR Code WhatsApp
-Secara default, port GOWA (3000) **tidak dipublish ke host** demi keamanan jaringan.
-
-Untuk scan QR pertama kali:
-1. Buka file `docker-compose.yml`, uncomment bagian port sementara GOWA:
-   ```yaml
-   ports:
-     - "127.0.0.1:3000:3000"
-   ```
-2. Jalankan docker compose:
-   ```bash
-   docker compose up -d
-   ```
-3. Buka browser di `http://127.0.0.1:3000`. Masukkan kredensial basic auth (default: `admin` / `gowaSecureAdmin123`), lalu scan QR Code menggunakan aplikasi WhatsApp di HP nomor kampus.
-4. Setelah WhatsApp terhubung, **tutup kembali port GOWA** untuk mengisolasi gateway:
-   - Comment kembali baris ports di `docker-compose.yml`.
-   - Jalankan ulang:
-     ```bash
-     docker compose up -d
-     ```
-   - Port 3000 kini sepenuhnya tertutup dari luar dan hanya bisa dihubungi oleh analyzer melalui network internal Docker.
-
-### 3. Akses Dashboard Web
-Buka browser di:
-```text
-http://127.0.0.1:8080
+### 2. Menjalankan Layanan Docker
+Jalankan seluruh service menggunakan Docker Compose:
+```bash
+docker compose up -d
 ```
-Login menggunakan `DASHBOARD_PASSWORD` yang telah diatur di `.env`.
+Port GOWA (3000) sepenuhnya terisolasi di dalam network internal Docker demi keamanan jaringan dan tidak pernah dipublish ke host.
+
+### 3. Login Dashboard & Scan QR WhatsApp Langsung
+1. Buka browser di:
+   ```text
+   http://127.0.0.1:8080
+   ```
+2. Login menggunakan `DASHBOARD_PASSWORD` yang telah diatur di `.env`.
+3. Buka menu **Status** (`/status`).
+4. Pada kartu **Koneksi Akun WhatsApp Kampus**, klik tombol **"📲 Tampilkan QR Code untuk Scan"**.
+5. Buka aplikasi WhatsApp di HP nomor kampus > Menu Titik Tiga / **Pengaturan** > **Perangkat Tertaut (Linked Devices)** > **Tautkan Perangkat (Link a Device)** > scan QR Code yang tampil di layar.
+6. Halaman akan otomatis mendeteksi koneksi secara live dan menampilkan status **🟢 Terhubung**.
 
 ---
 

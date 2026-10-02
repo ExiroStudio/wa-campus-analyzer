@@ -38,7 +38,7 @@ func setupTestDashboard(t *testing.T) (*db.DB, *Dashboard, chi.Router, func()) {
 		DBPath:            filepath.Join(tempDir, "test.db"),
 	}
 
-	dash, err := NewDashboard(cfg, database, nil)
+	dash, err := NewDashboard(cfg, database, nil, nil)
 	if err != nil {
 		database.Close()
 		os.RemoveAll(tempDir)
@@ -239,3 +239,33 @@ func TestDashboard_AgendaAndReviewAndStatus(t *testing.T) {
 		t.Errorf("expected 200 OK for status page, got %d", statusRec.Code)
 	}
 }
+
+func TestDashboard_WhatsAppEndpoints(t *testing.T) {
+	_, dash, r, cleanup := setupTestDashboard(t)
+	defer cleanup()
+
+	sessCookie, csrfCookie, csrfToken := getAuthenticatedSession(t, dash, r)
+
+	// Status endpoint
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/whatsapp/status", nil)
+	statusReq.AddCookie(sessCookie)
+	statusRec := httptest.NewRecorder()
+	r.ServeHTTP(statusRec, statusReq)
+	if statusRec.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for whatsapp status, got %d", statusRec.Code)
+	}
+
+	// Reset endpoint with CSRF
+	form := url.Values{}
+	form.Set("csrf_token", csrfToken)
+	resetReq := httptest.NewRequest(http.MethodPost, "/api/whatsapp/reset", strings.NewReader(form.Encode()))
+	resetReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resetReq.AddCookie(sessCookie)
+	resetReq.AddCookie(csrfCookie)
+	resetRec := httptest.NewRecorder()
+	r.ServeHTTP(resetRec, resetReq)
+	if resetRec.Code != http.StatusSeeOther {
+		t.Errorf("expected 303 See Other for whatsapp reset, got %d", resetRec.Code)
+	}
+}
+

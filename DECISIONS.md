@@ -77,9 +77,11 @@ Pemetaan ke tabel `messages`:
 
 ## 2. Keputusan Arsitektur & Aturan Read-Only
 
-1. **Komunikasi Satu Arah**:
-   - Analyzer sama sekali tidak mengimpor atau menginisialisasi HTTP client yang mengarah ke GOWA. Tidak ada kode `sendMessage`, `sendReaction`, `markRead`, `setPresence`, dll.
-   - Analyzer hanya bertindak sebagai HTTP server penerima (endpoint `POST /webhook/gowa`).
+1. **Isolasi Mutlak GOWA & Komunikasi Terkontrol**:
+   - Port 3000 GOWA **ditutup permanen** dari host (tidak ada port mapping di `docker-compose.yml`) untuk mencegah akses tidak terotorisasi dari luar.
+   - Analyzer hanya berkomunikasi ke GOWA melalui network internal Docker untuk membaca status perangkat (`GET /devices`), mengunduh gambar QR code login (`GET /statics/qrcode/...`), dan mereset sesi (`DELETE /devices/{id}`).
+   - Analyzer sama sekali **TIDAK memiliki kode atau HTTP client untuk mengirim pesan** (`/send/*`), membaca tanda centang (`/message/mark-read`), mereaksi, atau mengubah status online (`/user/presence`). Seluruh pengujian audit keamanan AST (`TestAudit_ZeroOutboundGOWACalls`) memvalidasi ketiadaan fungsi-fungsi pengiriman ini.
+   - Aliran data pesan WhatsApp tetap murni satu arah: dari GOWA ke Analyzer via webhook (`POST /webhook/gowa`).
 2. **Ketiadaan Tools/Functions pada LLM**:
    - Request ke OmniRoute OpenAI-compatible endpoint hanya mengirim `model`, `messages`, `temperature`, `max_tokens`, dan `response_format: {"type": "json_object"}`. Field `tools`, `functions`, dan `tool_choice` secara eksplisit dilarang.
 3. **Status Lokal**:

@@ -12,35 +12,39 @@ import (
 type Config struct {
 	ListenAddr         string
 	DBPath             string
-	GowaWebhookSecret  string
-	OmniRouteBaseURL   string
-	OmniRouteAPIKey    string
-	OmniRouteModel     string
-	DashboardPassword  string
-	SessionSecret      string
-	TZName             string
-	Location           *time.Location
-	WorkerConcurrency  int
-	ContextMessages    int
-	ContextWindowHours int
-	RetentionDays      int
+	GowaWebhookSecret      string
+	GOWABaseURL            string
+	GOWABasicAuthPassword  string
+	OmniRouteBaseURL       string
+	OmniRouteAPIKey        string
+	OmniRouteModel         string
+	DashboardPassword      string
+	SessionSecret          string
+	TZName                 string
+	Location               *time.Location
+	WorkerConcurrency      int
+	ContextMessages        int
+	ContextWindowHours     int
+	RetentionDays          int
 }
 
 func LoadConfig() (*Config, error) {
 	cfg := &Config{
-		ListenAddr:         getEnv("LISTEN_ADDR", "127.0.0.1:8080"),
-		DBPath:             getEnv("DB_PATH", "./data/analyzer.db"),
-		GowaWebhookSecret:  os.Getenv("GOWA_WEBHOOK_SECRET"),
-		OmniRouteBaseURL:   strings.TrimRight(os.Getenv("OMNIROUTE_BASE_URL"), "/"),
-		OmniRouteAPIKey:    os.Getenv("OMNIROUTE_API_KEY"),
-		OmniRouteModel:     os.Getenv("OMNIROUTE_MODEL"),
-		DashboardPassword:  os.Getenv("DASHBOARD_PASSWORD"),
-		SessionSecret:      os.Getenv("SESSION_SECRET"),
-		TZName:             getEnv("TZ_NAME", "Asia/Jakarta"),
-		WorkerConcurrency:  getEnvInt("WORKER_CONCURRENCY", 2),
-		ContextMessages:    getEnvInt("CONTEXT_MESSAGES", 5),
-		ContextWindowHours: getEnvInt("CONTEXT_WINDOW_HOURS", 24),
-		RetentionDays:      getEnvInt("RETENTION_DAYS", 0),
+		ListenAddr:            getEnv("LISTEN_ADDR", "127.0.0.1:8080"),
+		DBPath:                getEnv("DB_PATH", "./data/analyzer.db"),
+		GowaWebhookSecret:     os.Getenv("GOWA_WEBHOOK_SECRET"),
+		GOWABaseURL:           getEnv("GOWA_BASE_URL", "http://gowa:3000"),
+		GOWABasicAuthPassword: getEnv("GOWA_BASIC_AUTH_PASSWORD", "gowaSecureAdmin123"),
+		OmniRouteBaseURL:      strings.TrimRight(os.Getenv("OMNIROUTE_BASE_URL"), "/"),
+		OmniRouteAPIKey:       os.Getenv("OMNIROUTE_API_KEY"),
+		OmniRouteModel:        getEnv("OMNIROUTE_MODEL", "auto"),
+		DashboardPassword:     os.Getenv("DASHBOARD_PASSWORD"),
+		SessionSecret:         os.Getenv("SESSION_SECRET"),
+		TZName:                getEnv("TZ_NAME", "Asia/Jakarta"),
+		WorkerConcurrency:     getEnvInt("WORKER_CONCURRENCY", 2),
+		ContextMessages:       getEnvInt("CONTEXT_MESSAGES", 5),
+		ContextWindowHours:    getEnvInt("CONTEXT_WINDOW_HOURS", 24),
+		RetentionDays:         getEnvInt("RETENTION_DAYS", 0),
 	}
 
 	var missing []string
@@ -52,9 +56,6 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.OmniRouteAPIKey == "" {
 		missing = append(missing, "OMNIROUTE_API_KEY")
-	}
-	if cfg.OmniRouteModel == "" {
-		missing = append(missing, "OMNIROUTE_MODEL")
 	}
 	if cfg.DashboardPassword == "" {
 		missing = append(missing, "DASHBOARD_PASSWORD")

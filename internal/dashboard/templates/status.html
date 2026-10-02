@@ -29,6 +29,64 @@
   </div>
 </div>
 
+<!-- WhatsApp Device Connection & QR Scanner -->
+<div class="card" id="wa-connection-card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <span>📱 Koneksi Akun WhatsApp Kampus</span>
+    <span id="wa-header-badge" class="badge {{if and .WAStatus .WAStatus.Connected}}badge-success{{else}}badge-warning{{end}}">
+      {{if and .WAStatus .WAStatus.Connected}}● Terhubung{{else}}● Belum Terhubung{{end}}
+    </span>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div id="wa-connected-view" style="{{if not (and .WAStatus .WAStatus.Connected)}}display: none;{{end}}">
+      <div style="background: rgba(46, 204, 113, 0.1); border: 1px solid var(--success); padding: 1.25rem; border-radius: 8px; margin-bottom: 1.25rem;">
+        <h4 style="color: var(--success); margin: 0 0 0.5rem 0;">🟢 WhatsApp Aktif & Terhubung</h4>
+        <p style="margin: 0; font-size: 0.95rem; color: var(--text-main);">
+          Nomor kampus Anda sedang aktif terhubung ke gateway GOWA dan siap menerima pesan masuk untuk dianalisis oleh AI.
+        </p>
+        <div style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+          ID Perangkat: <code id="wa-device-id" style="color: var(--primary);">{{if .WAStatus}}{{.WAStatus.ID}}{{end}}</code>
+          {{if and .WAStatus .WAStatus.JID}}<br>JID WhatsApp: <strong style="color: var(--text-main);">{{.WAStatus.JID}}</strong>{{end}}
+        </div>
+      </div>
+      <form method="POST" action="/api/whatsapp/reset" onsubmit="return confirm('Apakah Anda yakin ingin memutuskan dan mereset sesi WhatsApp ini?');">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="btn btn-danger btn-sm">Putuskan / Reset Sesi WhatsApp</button>
+      </form>
+    </div>
+
+    <div id="wa-disconnected-view" style="{{if and .WAStatus .WAStatus.Connected}}display: none;{{end}}">
+      <div style="background: rgba(243, 156, 18, 0.1); border: 1px solid var(--warning); padding: 1.25rem; border-radius: 8px; margin-bottom: 1.25rem;">
+        <h4 style="color: var(--warning); margin: 0 0 0.5rem 0;">⚠️ Belum Terhubung ke WhatsApp</h4>
+        <p style="margin: 0; font-size: 0.95rem; color: var(--text-main);">
+          Klik tombol di bawah untuk memunculkan QR Code, lalu scan menggunakan WhatsApp di HP nomor kampus.
+        </p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1.5rem; background: var(--bg-hover); border-radius: 8px; border: 1px dashed var(--border-color); text-align: center;">
+        <div id="qr-loading-spinner" style="display: none; margin: 1rem 0;">
+          <div style="font-weight: 600; font-size: 1.05rem; color: var(--primary);">Memuat QR Code WhatsApp...</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem;">Menghubungkan ke gateway internal GOWA...</div>
+        </div>
+
+        <div id="qr-container" style="display: none; margin-bottom: 1rem;">
+          <div style="background: #ffffff; padding: 16px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+            <img id="qr-image" src="" alt="WhatsApp QR Code" style="width: 260px; height: 260px; display: block; image-rendering: pixelated;">
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 1rem; max-width: 320px;">
+            Buka WhatsApp di HP &gt; Menu Titik Tiga / <strong>Pengaturan</strong> &gt; <strong>Perangkat Tertaut</strong> &gt; <strong>Tautkan Perangkat</strong>.
+          </p>
+          <div id="qr-timer" style="font-size: 0.85rem; color: var(--warning); font-weight: 600; margin-top: 0.5rem;"></div>
+        </div>
+
+        <button id="btn-load-qr" class="btn btn-primary" onclick="loadQRCode()" type="button" style="padding: 0.6rem 1.5rem; font-size: 0.95rem;">
+          📲 Tampilkan QR Code untuk Scan
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Webhook & System Health -->
 <div class="card">
   <div class="card-header">
@@ -125,4 +183,76 @@
     </div>
   </div>
 </div>
+
+<script>
+let qrTimerInterval = null;
+
+function loadQRCode() {
+  const btn = document.getElementById('btn-load-qr');
+  const spinner = document.getElementById('qr-loading-spinner');
+  const qrContainer = document.getElementById('qr-container');
+  const qrImg = document.getElementById('qr-image');
+  const qrTimer = document.getElementById('qr-timer');
+
+  btn.style.display = 'none';
+  spinner.style.display = 'block';
+  qrContainer.style.display = 'none';
+
+  const qrUrl = '/api/whatsapp/qr?t=' + new Date().getTime();
+  qrImg.onload = function() {
+    spinner.style.display = 'none';
+    qrContainer.style.display = 'block';
+    btn.innerText = '🔄 Muat Ulang QR Code';
+    btn.style.display = 'inline-block';
+
+    let remaining = 30;
+    if (qrTimerInterval) clearInterval(qrTimerInterval);
+    qrTimer.innerText = '⏱️ QR berlaku selama: ' + remaining + ' detik';
+    qrTimerInterval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(qrTimerInterval);
+        qrTimer.innerText = '⚠️ QR Code kadaluarsa. Silakan muat ulang.';
+      } else {
+        qrTimer.innerText = '⏱️ QR berlaku selama: ' + remaining + ' detik';
+      }
+    }, 1000);
+  };
+
+  qrImg.onerror = function() {
+    spinner.style.display = 'none';
+    btn.style.display = 'inline-block';
+    btn.innerText = '❌ Gagal Memuat QR, Coba Lagi';
+  };
+
+  qrImg.src = qrUrl;
+}
+
+// Background polling mendeteksi perubahan status login WhatsApp otomatis
+setInterval(function() {
+  fetch('/api/whatsapp/status')
+    .then(res => res.json())
+    .then(data => {
+      const connView = document.getElementById('wa-connected-view');
+      const disconnView = document.getElementById('wa-disconnected-view');
+      const badge = document.getElementById('wa-header-badge');
+      const devId = document.getElementById('wa-device-id');
+
+      if (data.connected) {
+        connView.style.display = 'block';
+        disconnView.style.display = 'none';
+        badge.className = 'badge badge-success';
+        badge.innerText = '● Terhubung';
+        if (devId) devId.innerText = data.device_id;
+        if (qrTimerInterval) clearInterval(qrTimerInterval);
+      } else {
+        connView.style.display = 'none';
+        disconnView.style.display = 'block';
+        badge.className = 'badge badge-warning';
+        badge.innerText = '● Belum Terhubung';
+      }
+    })
+    .catch(() => {});
+}, 4000);
+</script>
 {{end}}

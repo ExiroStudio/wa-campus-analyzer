@@ -3,6 +3,7 @@ package dashboard
 import (
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -15,6 +16,7 @@ import (
 
 	"wa-campus-analyzer/internal/config"
 	"wa-campus-analyzer/internal/db"
+	"wa-campus-analyzer/internal/gowaclient"
 	"wa-campus-analyzer/internal/worker"
 
 	"github.com/go-chi/chi/v5"
@@ -30,20 +32,26 @@ type Dashboard struct {
 	cfg         *config.Config
 	db          *db.DB
 	auth        *AuthManager
+	gowaClient  *gowaclient.Client
 	logger      *slog.Logger
 	templates   map[string]*template.Template
 }
 
-func NewDashboard(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Dashboard, error) {
+func NewDashboard(cfg *config.Config, database *db.DB, gowaClient *gowaclient.Client, logger *slog.Logger) (*Dashboard, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
+	if gowaClient == nil && cfg.GOWABaseURL != "" {
+		gowaClient = gowaclient.NewClient(cfg.GOWABaseURL, "admin", cfg.GOWABasicAuthPassword)
+	}
+
 	d := &Dashboard{
-		cfg:    cfg,
-		db:     database,
-		auth:   NewAuthManager(cfg.DashboardPassword, cfg.SessionSecret),
-		logger: logger,
+		cfg:        cfg,
+		db:         database,
+		auth:       NewAuthManager(cfg.DashboardPassword, cfg.SessionSecret),
+		gowaClient: gowaClient,
+		logger:     logger,
 	}
 
 	if err := d.initTemplates(); err != nil {
@@ -121,6 +129,9 @@ func (d *Dashboard) RegisterRoutes(r chi.Router) {
 		pr.Get("/review", d.handleReviewQueue)
 		pr.Post("/jobs/{id}/retry", d.handleJobRetry)
 		pr.Get("/status", d.handleStatus)
+		pr.Get("/api/whatsapp/status", d.handleWhatsAppStatus)
+		pr.Get("/api/whatsapp/qr", d.handleWhatsAppQR)
+		pr.Post("/api/whatsapp/reset", d.handleWhatsAppReset)
 	})
 }
 
@@ -1138,10 +1149,16 @@ func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var waStatus *gowaclient.DeviceStatus
+	if d.gowaClient != nil {
+		waStatus, _ = d.gowaClient.GetDeviceStatus(r.Context())
+	}
+
 	data := map[string]any{
 		"Title":           "Status & Statistik",
 		"ActiveNav":       "status",
 		"CSRFToken":       d.auth.GenerateCSRFToken(w, r),
+		"WAStatus":        waStatus,
 		"TotalMessages":   totalMessages,
 		"TotalAnalyses":   totalAnalyses,
 		"PendingJobs":     pendingJobs,
@@ -1160,3 +1177,50 @@ func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	_ = d.templates["status.html"].ExecuteTemplate(w, "layout", data)
 }
+
+func (d *Dashboard) handleWhatsAppStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if d.gowaClient == nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "gowa client not configured", "connected": false})
+		return
+	}
+	status, err := d.gowaClient.GetDeviceStatus(r.Context())
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": err.Error(), "connected": false, "state": "error"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"connected": status.Connected,
+		"state":     status.State,
+		"device_id": status.ID,
+		"jid":       status.JID,
+	})
+}
+
+func (d *Dashboard) handleWhatsAppQR(w http.ResponseWriter, r *http.Request) {
+	if d.gowaClient == nil {
+		http.Error(w, "GOWA client not configured", http.StatusServiceUnavailable)
+		return
+	}
+	pngBytes, duration, err := d.gowaClient.GetQRCodePNG(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("X-QR-Duration", strconv.Itoa(duration))
+	_, _ = w.Write(pngBytes)
+}
+
+func (d *Dashboard) handleWhatsAppReset(w http.ResponseWriter, r *http.Request) {
+	if !d.auth.ValidateCSRF(r) {
+		http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+		return
+	}
+	if d.gowaClient != nil {
+		_ = d.gowaClient.DeleteDevice(r.Context())
+	}
+	http.Redirect(w, r, "/status", http.StatusSeeOther)
+}
+
