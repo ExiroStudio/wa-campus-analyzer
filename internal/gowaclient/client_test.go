@@ -73,6 +73,43 @@ func TestGOWAClient_GetDeviceStatus_Connected(t *testing.T) {
 	}
 }
 
+func TestGOWAClient_GetDeviceStatus_LoggedIn(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/devices" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"code":    "SUCCESS",
+				"message": "List devices",
+				"results": []map[string]any{
+					{
+						"id":    "dev-789",
+						"state": "logged_in",
+						"jid":   "6282146219728@s.whatsapp.net",
+					},
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	client := NewClient(ts.URL, "admin", "pass")
+	status, err := client.GetDeviceStatus(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !status.Connected {
+		t.Errorf("expected connected, got false")
+	}
+	if status.State != "logged_in" {
+		t.Errorf("expected logged_in, got %s", status.State)
+	}
+	if status.JID != "6282146219728@s.whatsapp.net" {
+		t.Errorf("expected jid, got %s", status.JID)
+	}
+}
+
 func TestGOWAClient_GetQRCodePNG(t *testing.T) {
 	fakePNG := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
 

@@ -98,14 +98,15 @@ func (c *Client) GetDeviceStatus(ctx context.Context) (*DeviceStatus, error) {
 	}
 
 	primary := listResp.Results[0]
-	// Sebuah device GOWA hanya benar-benar terhubung ke akun WhatsApp jika
-	// statusnya "connected" DAN sudah memiliki JID akun (nomor WhatsApp terverifikasi).
-	// Jika JID masih kosong, device baru berstatus placeholder yang sedang menunggu scan QR.
+	// Sebuah device GOWA terhubung jika statusnya "logged_in" atau sudah memiliki JID akun WhatsApp.
 	hasValidJID := strings.TrimSpace(primary.JID) != "" && strings.Contains(primary.JID, "@")
-	isConnected := strings.EqualFold(primary.State, "connected") && hasValidJID
+	isLoggedInState := strings.EqualFold(primary.State, "logged_in")
+	isConnected := isLoggedInState || (strings.EqualFold(primary.State, "connected") && hasValidJID)
 
 	state := primary.State
-	if !hasValidJID {
+	if isConnected {
+		state = "logged_in"
+	} else if !hasValidJID {
 		state = "unpaired"
 	}
 
@@ -123,7 +124,7 @@ func (c *Client) GetQRCodePNG(ctx context.Context) ([]byte, int, error) {
 		return nil, 0, err
 	}
 
-	if status.Connected {
+	if status.Connected || status.State == "logged_in" || (status.JID != "" && strings.Contains(status.JID, "@")) {
 		return nil, 0, errors.New("WhatsApp sudah terhubung")
 	}
 
@@ -145,38 +146,22 @@ func (c *Client) GetQRCodePNG(ctx context.Context) ([]byte, int, error) {
 	loginReq.SetBasicAuth(c.basicAuthUser, c.basicAuthPass)
 
 	loginResp, err := c.httpClient.Do(loginReq)
-	if err != nil || loginResp.StatusCode != http.StatusOK {
-		if loginResp != nil {
-			loginResp.Body.Close()
-		}
-		// Jika device lama stale atau gagal login, reset dan coba dengan device baru
-		_ = c.DeleteDevice(ctx)
-		newID, createErr := c.createDevice(ctx)
-		if createErr != nil {
-			return nil, 0, fmt.Errorf("gagal membuat perangkat baru: %w", createErr)
-		}
-		deviceID = newID
-
-		loginReq, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/devices/%s/login", c.baseURL, deviceID), nil)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to create login request: %w", err)
-		}
-		loginReq.SetBasicAuth(c.basicAuthUser, c.basicAuthPass)
-
-		loginResp, err = c.httpClient.Do(loginReq)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to request login QR: %w", err)
-		}
-		if loginResp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(loginResp.Body)
-			loginResp.Body.Close()
-			return nil, 0, fmt.Errorf("GOWA login returned HTTP %d: %s", loginResp.StatusCode, string(body))
-		}
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to request login QR: %w", err)
 	}
 	defer loginResp.Body.Close()
 
+	respBody, _ := io.ReadAll(loginResp.Body)
+	if strings.Contains(strings.ToLower(string(respBody)), "already logged in") {
+		return nil, 0, errors.New("WhatsApp sudah terhubung")
+	}
+
+	if loginResp.StatusCode != http.StatusOK {
+		return nil, 0, fmt.Errorf("GOWA login returned HTTP %d: %s", loginResp.StatusCode, string(respBody))
+	}
+
 	var loginData gowaLoginResponse
-	if err := json.NewDecoder(loginResp.Body).Decode(&loginData); err != nil {
+	if err := json.Unmarshal(respBody, &loginData); err != nil {
 		return nil, 0, fmt.Errorf("failed to decode login response: %w", err)
 	}
 
