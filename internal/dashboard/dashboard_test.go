@@ -269,3 +269,67 @@ func TestDashboard_WhatsAppEndpoints(t *testing.T) {
 	}
 }
 
+func TestDashboard_CategoriesRoute(t *testing.T) {
+	database, dash, r, cleanup := setupTestDashboard(t)
+	defer cleanup()
+
+	sessCookie, _, _ := getAuthenticatedSession(t, dash, r)
+
+	// Insert test message and analysis in database
+	res, err := database.Exec(`
+		INSERT INTO messages (wa_message_id, chat_jid, chat_name, sender_jid, sender_name, body, msg_type, sent_at, raw_payload)
+		VALUES ('msg_cat_1', 'chat_cat_1@g.us', 'Grup Kuliah', '628111@s.whatsapp.net', 'Dosen Budi', 'Tugas 1 dikumpulkan besok jam 22.00', 'text', CURRENT_TIMESTAMP, '{}')
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert test message: %v", err)
+	}
+	msgID, _ := res.LastInsertId()
+
+	_, err = database.Exec(`
+		INSERT INTO analyses (message_id, category, importance, action_required, deadline, summary, confidence, model, prompt_version, raw_response, is_current)
+		VALUES (?, 'tugas', 4, 1, '2026-10-06 03:00:00', 'Tugas 1 dikumpulkan besok', 0.95, 'gpt-4o-mini', 'classify_v1', '{}', 1)
+	`, msgID)
+	if err != nil {
+		t.Fatalf("failed to insert test analysis: %v", err)
+	}
+
+	// 1. Test GET /categories without filter
+	req := httptest.NewRequest(http.MethodGet, "/categories", nil)
+	req.AddCookie(sessCookie)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for /categories, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Board Kategori Pesan") {
+		t.Errorf("expected body to contain 'Board Kategori Pesan'")
+	}
+	if !strings.Contains(body, "Tugas &amp; PR") && !strings.Contains(body, "Tugas & PR") {
+		t.Errorf("expected body to contain column header 'Tugas & PR'")
+	}
+	if !strings.Contains(body, "Tugas 1 dikumpulkan besok") {
+		t.Errorf("expected body to contain test message summary")
+	}
+
+	// 2. Test GET /categories with search filter
+	reqSearch := httptest.NewRequest(http.MethodGet, "/categories?q=Tugas", nil)
+	reqSearch.AddCookie(sessCookie)
+	recSearch := httptest.NewRecorder()
+	r.ServeHTTP(recSearch, reqSearch)
+	if recSearch.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for /categories with query, got %d", recSearch.Code)
+	}
+
+	// 3. Test GET /categories with hide_done
+	reqHideDone := httptest.NewRequest(http.MethodGet, "/categories?hide_done=1", nil)
+	reqHideDone.AddCookie(sessCookie)
+	recHideDone := httptest.NewRecorder()
+	r.ServeHTTP(recHideDone, reqHideDone)
+	if recHideDone.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for /categories with hide_done, got %d", recHideDone.Code)
+	}
+}
+
+

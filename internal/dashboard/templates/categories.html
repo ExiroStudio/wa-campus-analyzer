@@ -1,0 +1,118 @@
+{{define "content"}}
+<div style="margin-bottom: 1.5rem;">
+  <h2>🏷️ Board Kategori Pesan</h2>
+  <p style="color: var(--text-muted); font-size: 0.9rem;">
+    Lihat dan pantau pesan kampus yang dikelompokkan secara terpisah berdasarkan kategori hasil analisis AI.
+  </p>
+</div>
+
+<!-- Filter Bar -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
+  <form method="GET" action="/categories" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 250px;">
+      <input type="text" name="q" value="{{.Query}}" placeholder="🔍 Cari pesan, pengirim, atau ringkasan..." 
+             style="width: 100%; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--card-border); background: var(--bg-color); color: var(--text-main);">
+    </div>
+    
+    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; user-select: none;">
+      <input type="checkbox" name="hide_done" value="1" {{if .HideDone}}checked{{end}} onchange="this.form.submit()">
+      <span>Sembunyikan yang sudah selesai</span>
+    </label>
+
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+      {{if or .Query .HideDone}}
+        <a href="/categories" class="btn btn-secondary btn-sm">Reset</a>
+      {{end}}
+    </div>
+  </form>
+</div>
+
+<!-- Board Multi-Kolom Kategori -->
+<div class="category-board-container">
+  <div class="category-board">
+    {{range .Columns}}
+    <div class="category-column">
+      <!-- Column Header -->
+      <div class="category-column-header {{.HeaderClass}}">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.2rem;">{{.Icon}}</span>
+          <span style="font-weight: 600; font-size: 1rem; color: #fff;">{{.Title}}</span>
+        </div>
+        <span class="badge {{.BadgeClass}}">{{.TotalCount}}</span>
+      </div>
+
+      <!-- Column Messages List -->
+      <div class="category-column-body">
+        {{if eq (len .Messages) 0}}
+          <div class="category-empty-state">
+            <div style="font-size: 2rem; opacity: 0.5; margin-bottom: 0.5rem;">📭</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Belum ada pesan pada kategori ini</div>
+          </div>
+        {{else}}
+          {{range .Messages}}
+          <div class="category-card {{if eq .UserStateStatus "done"}}card-completed{{end}}">
+            <div class="category-card-top">
+              <div class="category-urgency-badge">
+                {{if ge .Importance 4}}
+                  <span class="badge badge-danger">🔴 Mendesak</span>
+                {{else if eq .Importance 3}}
+                  <span class="badge badge-warning">🟠 Penting</span>
+                {{else}}
+                  <span class="badge badge-secondary" style="color: var(--text-muted);">⚪ Biasa</span>
+                {{end}}
+              </div>
+              <span class="category-card-time">{{.DisplayTime}}</span>
+            </div>
+
+            <!-- Summary -->
+            <div class="category-card-summary">
+              {{.Summary}}
+            </div>
+
+            <!-- Sender & Chat Info -->
+            <div class="category-card-sender">
+              👤 <strong>{{.SenderName}}</strong>
+              {{if and .ChatName (ne .ChatName .SenderName)}}
+                <span style="color: var(--text-muted); font-size: 0.75rem;">in {{.ChatName}}</span>
+              {{end}}
+            </div>
+
+            <!-- Deadline or Event Info -->
+            {{if .DisplayDeadline}}
+              <div class="category-card-deadline">
+                ⏰ <strong>Batas:</strong> {{.DisplayDeadline}}
+              </div>
+            {{end}}
+            {{if .DisplayEventStart}}
+              <div class="category-card-event">
+                📅 <strong>Jadwal:</strong> {{.DisplayEventStart}}
+              </div>
+            {{end}}
+
+            <!-- Card Actions -->
+            <div class="category-card-actions">
+              <a href="/messages/{{.ID}}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center;">Detail</a>
+
+              {{if eq .UserStateStatus "done"}}
+                <span class="badge badge-success" style="align-self: center;">✓ Selesai</span>
+              {{else if eq .UserStateStatus "ignored"}}
+                <span class="badge badge-secondary" style="align-self: center;">Dibaikan</span>
+              {{else}}
+                <form action="/messages/{{.ID}}/status" method="POST" style="margin: 0;">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="hidden" name="status" value="done">
+                  <input type="hidden" name="redirect_to" value="/categories">
+                  <button type="submit" class="btn btn-success btn-sm" title="Tandai Selesai">✓ Beres</button>
+                </form>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

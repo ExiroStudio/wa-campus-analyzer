@@ -84,7 +84,7 @@ func (d *Dashboard) initTemplates() error {
 
 	d.templates = make(map[string]*template.Template)
 
-	pages := []string{"inbox.html", "agenda.html", "detail.html", "review.html", "status.html"}
+	pages := []string{"inbox.html", "agenda.html", "detail.html", "review.html", "status.html", "categories.html"}
 	for _, page := range pages {
 		tmpl, err := template.New(page).Funcs(tmplFuncs).ParseFS(templateFS, "templates/layout.html", "templates/"+page)
 		if err != nil {
@@ -120,6 +120,7 @@ func (d *Dashboard) RegisterRoutes(r chi.Router) {
 		pr.Use(d.auth.RequireAuth)
 
 		pr.Get("/", d.handleInbox)
+		pr.Get("/categories", d.handleCategories)
 		pr.Get("/agenda", d.handleAgenda)
 		pr.Get("/messages/{id}", d.handleMessageDetail)
 		pr.Post("/messages/{id}/feedback", d.handleMessageFeedback)
@@ -402,6 +403,165 @@ func (d *Dashboard) handleInbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = d.templates["inbox.html"].ExecuteTemplate(w, "layout", data)
+}
+
+// -------------------------------------------------------------
+// Categories Handler
+// -------------------------------------------------------------
+
+type CategoryColumn struct {
+	Key         string
+	Title       string
+	Icon        string
+	HeaderClass string
+	BadgeClass  string
+	Messages    []MessageItem
+	TotalCount  int
+}
+
+func (d *Dashboard) handleCategories(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	hideDone := r.URL.Query().Get("hide_done") == "1"
+
+	whereClauses := []string{"1=1"}
+	var args []any
+
+	if q != "" {
+		whereClauses = append(whereClauses, "(m.body LIKE ? OR a.summary LIKE ? OR m.sender_name LIKE ?)")
+		searchTerm := "%" + q + "%"
+		args = append(args, searchTerm, searchTerm, searchTerm)
+	}
+
+	if hideDone {
+		whereClauses = append(whereClauses, "COALESCE(us.status, 'open') != 'done'")
+	}
+
+	whereSQL := strings.Join(whereClauses, " AND ")
+
+	query := fmt.Sprintf(`
+		SELECT
+			m.id, m.sender_name, m.chat_name, m.body, m.has_media, m.msg_type, m.sent_at,
+			COALESCE(us.category_override, a.category, ''),
+			COALESCE(us.importance_override, a.importance, 0),
+			COALESCE(a.summary, ''),
+			COALESCE(a.deadline, ''),
+			COALESCE(a.event_start, ''),
+			COALESCE(us.status, 'open'),
+			COALESCE(a.needs_review, 0),
+			COALESCE(j.status, 'pending'),
+			COALESCE(j.last_error, '')
+		FROM messages m
+		LEFT JOIN jobs j ON j.message_id = m.id
+		LEFT JOIN analyses a ON a.message_id = m.id AND a.is_current = 1
+		LEFT JOIN user_state us ON us.message_id = m.id
+		WHERE %s
+		ORDER BY m.sent_at DESC, m.id DESC
+	`, whereSQL)
+
+	rows, err := d.db.Query(query, args...)
+	if err != nil {
+		d.logger.Error("Failed to fetch category messages", "error", err.Error())
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	columns := []*CategoryColumn{
+		{Key: "tugas", Title: "Tugas & PR", Icon: "📝", HeaderClass: "cat-header-tugas", BadgeClass: "badge-primary"},
+		{Key: "ujian_kuis", Title: "Ujian & Kuis", Icon: "📋", HeaderClass: "cat-header-ujian", BadgeClass: "badge-danger"},
+		{Key: "jadwal", Title: "Jadwal & Kuliah", Icon: "📅", HeaderClass: "cat-header-jadwal", BadgeClass: "badge-info"},
+		{Key: "workshop_event", Title: "Workshop & Event", Icon: "🎯", HeaderClass: "cat-header-workshop", BadgeClass: "badge-warning"},
+		{Key: "pengumuman", Title: "Pengumuman", Icon: "📢", HeaderClass: "cat-header-pengumuman", BadgeClass: "badge-primary"},
+		{Key: "info_umum", Title: "Info Umum", Icon: "💡", HeaderClass: "cat-header-info", BadgeClass: "badge-secondary"},
+		{Key: "obrolan", Title: "Obrolan & Lainnya", Icon: "💬", HeaderClass: "cat-header-obrolan", BadgeClass: "badge-secondary"},
+	}
+
+	colMap := make(map[string]*CategoryColumn)
+	for _, col := range columns {
+		col.Messages = make([]MessageItem, 0)
+		colMap[col.Key] = col
+	}
+
+	for rows.Next() {
+		var (
+			item                                MessageItem
+			hasMediaInt                         int
+			senderName, chatName, body, msgType sql.NullString
+			sentAtStr                           string
+			deadlineStr, eventStartStr          string
+		)
+		err := rows.Scan(
+			&item.ID, &senderName, &chatName, &body, &hasMediaInt, &msgType, &sentAtStr,
+			&item.Category, &item.Importance, &item.Summary,
+			&deadlineStr, &eventStartStr, &item.UserStateStatus,
+			&item.NeedsReview, &item.JobStatus, &item.LastError,
+		)
+		if err != nil {
+			d.logger.Error("Failed to scan category message item", "error", err.Error())
+			continue
+		}
+
+		item.SenderName = senderName.String
+		item.ChatName = chatName.String
+		item.Body = body.String
+		item.HasMedia = hasMediaInt == 1
+		item.MsgType = msgType.String
+
+		if len([]rune(item.Body)) > 120 {
+			item.TruncatedBody = string([]rune(item.Body)[:120]) + "..."
+		} else {
+			item.TruncatedBody = item.Body
+		}
+
+		t, _ := time.Parse(time.RFC3339, sentAtStr)
+		if t.IsZero() {
+			t, _ = time.Parse("2006-01-02 15:04:05", sentAtStr)
+		}
+		item.DisplayTime = t.In(d.cfg.Location).Format("02 Jan 15:04")
+
+		if deadlineStr != "" {
+			dt, _ := time.Parse(time.RFC3339, deadlineStr)
+			if dt.IsZero() {
+				dt, _ = time.Parse("2006-01-02 15:04:05", deadlineStr)
+			}
+			item.DisplayDeadline = dt.In(d.cfg.Location).Format("02 Jan 15:04")
+		}
+
+		if eventStartStr != "" {
+			et, _ := time.Parse(time.RFC3339, eventStartStr)
+			if et.IsZero() {
+				et, _ = time.Parse("2006-01-02 15:04:05", eventStartStr)
+			}
+			item.DisplayEventStart = et.In(d.cfg.Location).Format("02 Jan 15:04")
+		}
+
+		if item.Importance > 0 {
+			item.StarsFull = make([]int, item.Importance)
+			item.StarsEmpty = make([]int, 5-item.Importance)
+		}
+
+		targetCol, ok := colMap[item.Category]
+		if !ok {
+			targetCol = colMap["obrolan"]
+		}
+		targetCol.Messages = append(targetCol.Messages, item)
+		targetCol.TotalCount++
+	}
+
+	data := map[string]any{
+		"Title":     "Board Kategori",
+		"ActiveNav": "categories",
+		"CSRFToken": d.auth.GenerateCSRFToken(w, r),
+		"Columns":   columns,
+		"Query":     q,
+		"HideDone":  hideDone,
+	}
+
+	if tmpl, ok := d.templates["categories.html"]; ok {
+		_ = tmpl.ExecuteTemplate(w, "layout", data)
+	} else {
+		http.Error(w, "Template not found", http.StatusInternalServerError)
+	}
 }
 
 // -------------------------------------------------------------
@@ -822,6 +982,9 @@ func (d *Dashboard) handleMessageStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	redirect := r.FormValue("redirect")
+	if redirect == "" {
+		redirect = r.FormValue("redirect_to")
+	}
 	if redirect == "" {
 		redirect = fmt.Sprintf("/messages/%d", msgID)
 	}
